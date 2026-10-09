@@ -1,0 +1,127 @@
+{
+ "wikidata:P36": {
+  "relation": "capital",
+  "object_final": "The capital of {s} is {o}.",
+  "subject_final": "{o} is the capital of {s}."
+ },
+ "wikidata:P112": {
+  "relation": "founded_by",
+  "object_final": "{s} was founded by {o}.",
+  "subject_final": "{o} founded {s}."
+ },
+ "wikidata:P61": {
+  "relation": "discoverer_or_inventor",
+  "object_final": "{s} was discovered or invented by {o}.",
+  "subject_final": "{o} discovered or invented {s}."
+ },
+ "wikidata:P50": {
+  "relation": "author",
+  "object_final": "{s} was written by {o}.",
+  "subject_final": "{o} is the author of {s}."
+ },
+ "wikidata:P57": {
+  "relation": "director",
+  "object_final": "{s} was directed by {o}.",
+  "subject_final": "{o} directed {s}."
+ },
+ "wikidata:P86": {
+  "relation": "composer",
+  "object_final": "The music of {s} was composed by {o}.",
+  "subject_final": "{o} composed {s}."
+ },
+ "wikidata:P169": {
+  "relation": "chief_executive_officer",
+  "object_final": "The chief executive officer of {s} is {o}.",
+  "subject_final": "{o} is the CEO of {s}."
+ },
+ "wikidata:P19": {
+  "relation": "place_of_birth",
+  "object_final": "{s} was born in {o}.",
+  "subject_final": "{o} is the birthplace of {s}."
+ },
+ "wikidata:P69": {
+  "relation": "educated_at",
+  "object_final": "{s} studied at {o}.",
+  "subject_final": "The alumni of {o} include {s}."
+ },
+ "wikidata:P38": {
+  "relation": "currency",
+  "object_final": "The currency of {s} is {o}.",
+  "subject_final": "{o} is the currency of {s}."
+ },
+ "wikidata:P176": {
+  "relation": "manufacturer",
+  "object_final": "{s} is manufactured by {o}.",
+  "subject_final": "{o} manufactures {s}."
+ },
+ "wikidata:P178": {
+  "relation": "developer",
+  "object_final": "{s} was developed by {o}.",
+  "subject_final": "{o} developed {s}."
+ },
+ "wikidata:P175": {
+  "relation": "performer",
+  "object_final": "{s} was performed by {o}.",
+  "subject_final": "{o} performed {s}."
+ },
+ "wikidata:P54": {
+  "relation": "member_of_sports_team",
+  "object_final": "{s} plays for {o}.",
+  "subject_final": "The players of {o} include {s}."
+ },
+ "wikidata:P6": {
+  "relation": "head_of_government",
+  "object_final": "The head of government of {s} is {o}.",
+  "subject_final": "{o} is the head of government of {s}."
+ },
+ "conceptnet:IsA": {
+  "relation": "IsA",
+  "object_final": "A {s} is a {o}.",
+  "subject_final": "One example of a {o} is the {s}."
+ },
+ "conceptnet:PartOf": {
+  "relation": "PartOf",
+  "object_final": "A {s} is part of a {o}.",
+  "subject_final": "One part of a {o} is the {s}."
+ },
+ "conceptnet:AtLocation": {
+  "relation": "AtLocation",
+  "object_final": "You are likely to find a {s} in a {o}.",
+  "subject_final": "In a {o}, you are likely to find a {s}."
+ },
+ "conceptnet:UsedFor": {
+  "relation": "UsedFor",
+  "object_final": "A {s} is used for {o}.",
+  "subject_final": "Something you can use for {o} is a {s}."
+ },
+ "conceptnet:CapableOf": {
+  "relation": "CapableOf",
+  "object_final": "A {s} can {o}.",
+  "subject_final": "Something that can {o} is a {s}."
+ },
+ "conceptnet:HasA": {
+  "relation": "HasA",
+  "object_final": "A {s} has a {o}.",
+  "subject_final": "A {o} belongs to a {s}."
+ },
+ "conceptnet:MadeOf": {
+  "relation": "MadeOf",
+  "object_final": "A {s} is made of {o}.",
+  "subject_final": "Something made of {o} is a {s}."
+ },
+ "conceptnet:HasProperty": {
+  "relation": "HasProperty",
+  "object_final": "A {s} is {o}.",
+  "subject_final": "Something that is {o} is a {s}."
+ },
+ "wordnet:hypernym": {
+  "relation": "hypernym",
+  "object_final": "A {s} is a {o}.",
+  "subject_final": "One example of a {o} is the {s}."
+ },
+ "wordnet:part_meronym": {
+  "relation": "part_meronym",
+  "object_final": "One part of a {s} is the {o}.",
+  "subject_final": "A {o} is part of a {s}."
+ }
+}
