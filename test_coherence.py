@@ -147,7 +147,7 @@ def test_a_constant_per_candidate_leaves_LR_F_B_but_can_change_K():
         lp = random_lp(rng)
         shifted = dict(lp, o1_given_s1=lp["o1_given_s1"] - 4.0, o1_given_s2=lp["o1_given_s2"] - 4.0)
         a, b = derive(lp), derive(shifted)
-        for k in ("log_ratio", "forward_margin", "backward_margin"):
+        for k in ("log_ratio", "forward_log_odds_ratio", "backward_log_odds_ratio"):
             assert math.isclose(a[k], b[k], abs_tol=1e-9)
         k_changed += a["knowledge_score"] != b["knowledge_score"]
     assert k_changed > 0
@@ -156,21 +156,29 @@ def test_a_constant_per_candidate_leaves_LR_F_B_but_can_change_K():
 def test_a_model_that_ignores_the_prompt_scores_LR_0_and_K_2():
     prior = {"o1": -3.0, "o2": -5.0, "s1": -2.0, "s2": -7.0}
     d = derive({t: prior[t.split("_given_")[0]] for t in TERMS})
-    assert d["log_ratio"] == d["forward_margin"] == d["backward_margin"] == 0
+    assert d["log_ratio"] == d["forward_log_odds_ratio"] == d["backward_log_odds_ratio"] == 0
     assert d["knowledge_score"] == 2
 
 
 def test_relative_incoherence_edge_cases():
     def lp(F, B):
-        return {"o1_given_s1": F, "o2_given_s1": 0.0, "o2_given_s2": F, "o1_given_s2": 0.0,
-                "s1_given_o1": B, "s2_given_o1": 0.0, "s2_given_o2": B, "s1_given_o2": 0.0}
+    return {
+        "o1_given_s1": F,
+        "o2_given_s1": 0.0,
+        "o2_given_s2": 0.0,
+        "o1_given_s2": 0.0,
+        "s1_given_o1": B,
+        "s2_given_o1": 0.0,
+        "s2_given_o2": 0.0,
+        "s1_given_o2": 0.0,
+    }
     assert derive(lp(3, -3))["relative_incoherence"] == pytest.approx(1.0)    # opposite signs
-    assert derive(lp(3, 0))["relative_incoherence"] == pytest.approx(1.0)     # one margin zero
-    assert derive(lp(0.1, -0.05))["relative_incoherence"] == 1.0              # exactly 1, even for tiny margins
-    assert derive(lp(3, 1))["relative_incoherence"] == pytest.approx(0.5)     # |B - F| / (|F| + |B|) = 2 / 4
-    assert derive(lp(3, 3))["relative_incoherence"] == 0                      # F = B
-    assert derive(lp(0, 0))["relative_incoherence"] == 0                      # defined as 0
-    assert derive(lp(0, 0))["knowledge_score"] == 0                           # ties count as wrong
+    assert derive(lp(3, 0))["relative_incoherence"] == pytest.approx(1.0)     # one log odds ratio zero
+    assert derive(lp(0.1, -0.05))["relative_incoherence"] == pytest.approx(1.0)  # small log odds ratios, opposite signs
+    assert derive(lp(3, 1))["relative_incoherence"] == pytest.approx(0.5)     # |1 - 3| / (|3| + |1|) = 2 / 4
+    assert derive(lp(3, 3))["relative_incoherence"] == pytest.approx(0.0)     # F = B
+    assert derive(lp(0, 0))["relative_incoherence"] == pytest.approx(0.0)     # defined as 0 when both are zero
+    assert derive(lp(0, 0))["knowledge_score"] == 0                          # ties count as wrong
 
 
 def test_bad_log_probabilities_are_rejected():
@@ -315,7 +323,11 @@ def test_end_to_end_with_a_fake_scorer(tmp_path, fake):
     rows = list(csv.DictReader(open(out, encoding="utf-8")))
     assert list(rows[0]) == list(run.load_quartets(QUARTETS, 1)[0]) + run.ADDED_FIELDS
     for r in rows:
-        assert abs(float(r["log_ratio"]) - 2 * (float(r["backward_margin"]) - float(r["forward_margin"]))) < 1e-6
+        assert math.isclose(
+            float(r["log_ratio"]),
+            float(r["backward_log_odds_ratio"]) - float(r["forward_log_odds_ratio"]),
+            abs_tol=1e-6,
+        )
         for t in TERMS:
             candidate, given = t.split("_given_")
             assert abs(fake_logprob(r[f"prompt_{given}"], r[f"cont_{candidate}"]) - float(r[f"lp_{t}"])) < 1e-9
@@ -323,18 +335,44 @@ def test_end_to_end_with_a_fake_scorer(tmp_path, fake):
     summary = run.summarize(rows)
     assert summary["overall"]["n"] == 40 and sum(t["n"] for t in summary["by_relation"].values()) == 40
 
+def test_full_log_odds_ratios_and_two_absolute_value_normalisation():
+    lp = {
+        "o1_given_s1": -2.0,
+        "o2_given_s1": -12.0,
+        "o1_given_s2": -8.0,
+        "o2_given_s2": -12.0,
+        "s1_given_o1": -3.0,
+        "s2_given_o1": -10.0,
+        "s1_given_o2": -4.0,
+        "s2_given_o2": -9.0,
+    }
+    d = derive(lp)
 
+    assert d["forward_log_odds_ratio"] == pytest.approx(6.0)
+    assert d["backward_log_odds_ratio"] == pytest.approx(2.0)
+    assert d["log_ratio"] == pytest.approx(-4.0)
+
+    assert d["relative_incoherence"] == pytest.approx(0.5)
+    assert d["knowledge_score"] == 2
+    
 def test_summary_on_a_hand_made_file(tmp_path):
     path = tmp_path / "s.csv"
     with open(path, "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(run.SCORE_COLUMNS)
-        w.writerows([("m", "wikidata", "capital", -4, 3, 1, 1.0, 4, 2, 2), ("m", "wikidata", "capital", 2, 1, 2, 0.67, 4, 2, 2),
-                     ("m", "wikidata", "author", 0.5, 0, 0.25, 2.0, 1, 0, 1), ("m", "wordnet", "hypernym", -1, 1, 0.5, 0.67, 3, 2, 1)])
+        w.writerows([
+            ("m", "wikidata", "capital", -4, 6, 2, 0.5, 4, 2, 2),
+            ("m", "wikidata", "capital", 2, 2, 4, 1 / 3, 4, 2, 2),
+            ("m", "wikidata", "author", 0.5, 0, 0.5, 1.0, 1, 0, 1),
+            ("m", "wordnet", "hypernym", -1, 2, 1, 1 / 3, 3, 2, 1),
+        ])
     s = run.summarize(run.read_csv(str(path), run.SCORE_COLUMNS, "scores"))["overall"]
     assert s["n"] == 4 and s["median_abs_LR"] == pytest.approx(1.5)        # median of 4, 2, 0.5, 1
     assert s["share_within_1_nat"] == pytest.approx(0.25) and s["share_LR_negative"] == pytest.approx(0.5)
     assert s["pairwise_accuracy_forward"] == pytest.approx(0.75)
+    assert s["mean_F"] == pytest.approx(2.5)
+    assert s["mean_B"] == pytest.approx(1.875)
+    assert s["mean_R"] == pytest.approx(13 / 24)
 
 
 def test_bad_inputs_give_clear_errors(tmp_path):
