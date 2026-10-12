@@ -162,16 +162,16 @@ def test_a_model_that_ignores_the_prompt_scores_LR_0_and_K_2():
 
 def test_relative_incoherence_edge_cases():
     def lp(F, B):
-    return {
-        "o1_given_s1": F,
-        "o2_given_s1": 0.0,
-        "o2_given_s2": 0.0,
-        "o1_given_s2": 0.0,
-        "s1_given_o1": B,
-        "s2_given_o1": 0.0,
-        "s2_given_o2": 0.0,
-        "s1_given_o2": 0.0,
-    }
+        return {
+            "o1_given_s1": F,
+            "o2_given_s1": 0.0,
+            "o2_given_s2": 0.0,
+            "o1_given_s2": 0.0,
+            "s1_given_o1": B,
+            "s2_given_o1": 0.0,
+            "s2_given_o2": 0.0,
+            "s1_given_o2": 0.0,
+        }
     assert derive(lp(3, -3))["relative_incoherence"] == pytest.approx(1.0)    # opposite signs
     assert derive(lp(3, 0))["relative_incoherence"] == pytest.approx(1.0)     # one log odds ratio zero
     assert derive(lp(0.1, -0.05))["relative_incoherence"] == pytest.approx(1.0)  # small log odds ratios, opposite signs
