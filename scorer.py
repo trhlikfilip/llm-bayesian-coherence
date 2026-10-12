@@ -32,41 +32,42 @@ class Scorer:
         if self.tokenizer.pad_token_id is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
         self.model.to(device).eval()
-def encode(self, prompt: str, continuation: str) -> tuple[list[int], int]:
-    """Token ids through the continuation, and its first token index."""
-    if not prompt or not continuation.strip():
-        raise ValueError(f"empty prompt or continuation: {prompt!r} + {continuation!r}")
+        
+    def encode(self, prompt: str, continuation: str) -> tuple[list[int], int]:
+        """Token ids through the continuation, and its first token index."""
+        if not prompt or not continuation.strip():
+            raise ValueError(f"empty prompt or continuation: {prompt!r} + {continuation!r}")
 
-    enc = self.tokenizer(
-        prompt + continuation,
-        return_offsets_mapping=True,
-        add_special_tokens=True,
-    )
-    ids = list(enc["input_ids"])
-    offsets = list(enc["offset_mapping"])
-    boundary = len(prompt)
-
-    positions = [
-        i for i, (a, b) in enumerate(offsets)
-        if b > a and a >= boundary
-    ]
-
-    if (
-        not positions
-        or positions[0] < 1
-        or any(a < boundary < b for a, b in offsets)
-    ):
-        raise ValueError(
-            f"cannot separate the continuation tokens of {prompt!r} + {continuation!r}"
+        enc = self.tokenizer(
+            prompt + continuation,
+            return_offsets_mapping=True,
+            add_special_tokens=True,
         )
+        ids = list(enc["input_ids"])
+        offsets = list(enc["offset_mapping"])
+        boundary = len(prompt)
 
-    start, stop = positions[0], positions[-1] + 1
-    if positions != list(range(start, stop)):
-        raise ValueError(
-            f"non-text token inside continuation: {prompt!r} + {continuation!r}"
-        )
+        positions = [
+            i for i, (a, b) in enumerate(offsets)
+            if b > a and a >= boundary
+        ]
 
-    return ids[:stop], start
+        if (
+            not positions
+            or positions[0] < 1
+            or any(a < boundary < b for a, b in offsets)
+        ):
+            raise ValueError(
+                f"cannot separate the continuation tokens of {prompt!r} + {continuation!r}"
+            )
+
+        start, stop = positions[0], positions[-1] + 1
+        if positions != list(range(start, stop)):
+            raise ValueError(
+                f"non-text token inside continuation: {prompt!r} + {continuation!r}"
+            )
+
+        return ids[:stop], start
 
     def score(self, pairs: list[tuple[str, str]], batch_size: int) -> list[dict]:
         """[{"logprob": float, "n_tokens": int}] for each pair, in the input order."""
