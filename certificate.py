@@ -16,11 +16,11 @@ the true partner wins:
     F1 = lp(o1|s1) - lp(o2|s1)      F2 = lp(o2|s2) - lp(o1|s2)     forward, object given subject
     B1 = lp(s1|o1) - lp(s2|o1)      B2 = lp(s2|o2) - lp(s1|o2)     backward, subject given object
 
-and LR = (B1 + B2) - (F1 + F2) = 2 (B - F) with F = (F1 + F2)/2 and B = (B1 + B2)/2.
-LR < 0 means the forward margin is larger.
+The full log odds ratios are F = F1 + F2 and B = B1 + B2.
+LR = B - F. LR < 0 means the forward log odds ratio is larger.
 
     K = number of the four margins that are > 0 (a tie counts as wrong), 0 to 4
-    R = |LR| / (2|F| + 2|B|) = |B - F| / (|F| + |B|), 0 to 1, and 0 when F = B = 0
+    R = |LR| / (|F| + |B|), 0 to 1, and 0 when F = B = 0
 """
 
 from __future__ import annotations
@@ -48,18 +48,17 @@ def derive(lp: dict[str, float]) -> dict:
     f2 = lp["o2_given_s2"] - lp["o1_given_s2"]
     b1 = lp["s1_given_o1"] - lp["s2_given_o1"]
     b2 = lp["s2_given_o2"] - lp["s1_given_o2"]
-    F, B = (f1 + f2) / 2, (b1 + b2) / 2
-    LR = log_ratio(lp)
-    if not math.isclose(LR, 2 * (B - F), rel_tol=1e-9, abs_tol=1e-6):
-        raise ArithmeticError(f"LR = 2(B - F) violated: {LR} vs {2 * (B - F)}")
+    F = f1 + f2
+    B = b1 + b2
+    LR = B - F
     forward_correct, backward_correct = int(f1 > 0) + int(f2 > 0), int(b1 > 0) + int(b2 > 0)
     scale = abs(F) + abs(B)
     return {
         "log_ratio": LR,
         "abs_log_ratio": abs(LR),
-        "forward_margin": F,
-        "backward_margin": B,
-        "relative_incoherence": abs(B - F) / scale if scale > 0 else 0.0,   # = |LR| / (2 scale), never above 1 in floats
+        "forward_log_odds_ratio": F,
+        "backward_log_odds_ratio": B,
+        "relative_incoherence": abs(LR) / scale if scale > 0 else 0.0,
         "knowledge_score": forward_correct + backward_correct,
         "forward_correct": forward_correct,
         "backward_correct": backward_correct,
