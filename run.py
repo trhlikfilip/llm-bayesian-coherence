@@ -27,11 +27,11 @@ from scorer import score_with_cache
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 QUARTET_COLUMNS = ("source", "relation_id", "relation_name", "s1_label", "o1_label", "s2_label", "o2_label")
-SCORE_COLUMNS = ("model", "source", "relation_name", "log_ratio", "forward_margin", "backward_margin",
+SCORE_COLUMNS = ("model", "source", "relation_name", "log_ratio", "forward_log_odds_ratio", "backward_log_odds_ratio",
                  "relative_incoherence", "knowledge_score", "forward_correct", "backward_correct")
 ADDED_FIELDS = (["model", "prompt_s1", "prompt_s2", "prompt_o1", "prompt_o2", "cont_o1", "cont_o2", "cont_s1", "cont_s2"]
                 + [f"lp_{t}" for t in TERMS] + [f"ntok_{t}" for t in TERMS]
-                + ["log_ratio", "abs_log_ratio", "forward_margin", "backward_margin",
+                + ["log_ratio", "abs_log_ratio", "forward_log_odds_ratio", "backward_log_odds_ratio",
                    "relative_incoherence", "knowledge_score", "forward_correct", "backward_correct"])
 
 
@@ -133,8 +133,8 @@ def _stats(rows: list[dict]) -> dict:
         "mean_LR": mean(lr),
         "share_within_1_nat": mean(abs(x) < 1 for x in lr),
         "share_LR_negative": mean(x < 0 for x in lr),
-        "mean_F": mean(float(r["forward_margin"]) for r in rows),
-        "mean_B": mean(float(r["backward_margin"]) for r in rows),
+        "mean_F": mean(float(r["forward_log_odds_ratio"]) for r in rows),
+        "mean_B": mean(float(r["backward_log_odds_ratio"]) for r in rows),
         "mean_R": mean(float(r["relative_incoherence"]) for r in rows),
         "mean_K": mean(K),
         "share_fully_known": mean(k == 4 for k in K),
