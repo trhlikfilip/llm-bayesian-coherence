@@ -13,6 +13,7 @@ import hashlib
 import json
 import os
 import time
+import tempfile
 
 
 class Scorer:
@@ -31,17 +32,41 @@ class Scorer:
         if self.tokenizer.pad_token_id is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
         self.model.to(device).eval()
+def encode(self, prompt: str, continuation: str) -> tuple[list[int], int]:
+    """Token ids through the continuation, and its first token index."""
+    if not prompt or not continuation.strip():
+        raise ValueError(f"empty prompt or continuation: {prompt!r} + {continuation!r}")
 
-    def encode(self, prompt: str, continuation: str) -> tuple[list[int], int]:
-        """Token ids of prompt + continuation, and the index of the first continuation token."""
-        if not prompt or not continuation.strip():
-            raise ValueError(f"empty prompt or continuation: {prompt!r} + {continuation!r}")
-        enc = self.tokenizer(prompt + continuation, return_offsets_mapping=True, add_special_tokens=True)
-        ids, offsets, end = list(enc["input_ids"]), list(enc["offset_mapping"]), len(prompt)
-        start = next((i for i, (a, b) in enumerate(offsets) if b > a and a >= end), None)
-        if start is None or start < 1 or any(a < end < b for a, b in offsets):
-            raise ValueError(f"cannot separate the continuation tokens of {prompt!r} + {continuation!r}")
-        return ids, start
+    enc = self.tokenizer(
+        prompt + continuation,
+        return_offsets_mapping=True,
+        add_special_tokens=True,
+    )
+    ids = list(enc["input_ids"])
+    offsets = list(enc["offset_mapping"])
+    boundary = len(prompt)
+
+    positions = [
+        i for i, (a, b) in enumerate(offsets)
+        if b > a and a >= boundary
+    ]
+
+    if (
+        not positions
+        or positions[0] < 1
+        or any(a < boundary < b for a, b in offsets)
+    ):
+        raise ValueError(
+            f"cannot separate the continuation tokens of {prompt!r} + {continuation!r}"
+        )
+
+    start, stop = positions[0], positions[-1] + 1
+    if positions != list(range(start, stop)):
+        raise ValueError(
+            f"non-text token inside continuation: {prompt!r} + {continuation!r}"
+        )
+
+    return ids[:stop], start
 
     def score(self, pairs: list[tuple[str, str]], batch_size: int) -> list[dict]:
         """[{"logprob": float, "n_tokens": int}] for each pair, in the input order."""
@@ -71,23 +96,49 @@ class Scorer:
 
 
 def load_cache(path: str, log=print) -> dict[str, dict]:
-    """Records of a jsonl cache. A line that cannot be read, such as a partial last line
-    after a crash, is dropped and the file rewritten without it."""
+    """Load cached scores, repairing unreadable records and a missing final newline."""
     if not os.path.exists(path):
         return {}
+
     cache, good, bad = {}, [], 0
+    needs_rewrite = False
+
     with open(path, encoding="utf-8") as f:
         for line in f:
             try:
                 rec = json.loads(line)
                 cache[rec["key"]] = rec
-                good.append(line if line.endswith("\n") else line + "\n")
+
+                if not line.endswith("\n"):
+                    needs_rewrite = True
+                    line += "\n"
+
+                good.append(line)
             except (json.JSONDecodeError, KeyError, TypeError):
                 bad += 1
+                needs_rewrite = True
+
     if bad:
         log(f"[cache] dropped {bad} unreadable line(s) from {path}")
-        with open(path, "w", encoding="utf-8") as f:
-            f.writelines(good)
+
+    if needs_rewrite:
+        temporary_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=os.path.dirname(os.path.abspath(path)),
+                prefix=".cache-repair-",
+                delete=False,
+            ) as f:
+                temporary_path = f.name
+                f.writelines(good)
+
+            os.replace(temporary_path, path)
+        finally:
+            if temporary_path is not None and os.path.exists(temporary_path):
+                os.unlink(temporary_path)
+
     return cache
 
 
@@ -101,7 +152,12 @@ def score_with_cache(model_id: str, pairs: list[tuple[str, str]], cache_path: st
     if device != "cuda":
         dtype = "fp32"                                          # half precision only on cuda
     cache = load_cache(cache_path, log)
-    keys = [hashlib.sha1(f"{model_id}\x1f{dtype}\x1f{p}\x1f{c}".encode()).hexdigest() for p, c in pairs]
+    keys = [
+        hashlib.sha1(
+            f"label-prefix-v2\x1f{model_id}\x1f{dtype}\x1f{p}\x1f{c}".encode()
+        ).hexdigest()
+        for p, c in pairs
+    ]
     todo = [i for i, k in enumerate(keys) if k not in cache]
     if not todo:
         log(f"[score] all {len(pairs):,} pairs already in {cache_path}")
