@@ -159,7 +159,7 @@ def score_with_cache(model_id: str, pairs: list[tuple[str, str]], cache_path: st
     cache = load_cache(cache_path, log)
     keys = [
         hashlib.sha1(
-            f"label-prefix-v2\x1f{model_id}\x1f{dtype}\x1f{p}\x1f{c}".encode()
+            f"label-prefix-v3\x1f{model_id}\x1f{dtype}\x1f{p}\x1f{c}".encode()
         ).hexdigest()
         for p, c in pairs
     ]
