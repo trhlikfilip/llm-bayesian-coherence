@@ -197,12 +197,20 @@ class WordTokenizer:
     def __init__(self, bos=True):
         self.bos, self.vocab, self.pad_token_id = bos, {}, 0
 
-    def __call__(self, text, return_offsets_mapping=True, add_special_tokens=True):
+    def __call__(self, text, return_offsets_mapping=True, add_special_tokens=True,
+                 return_special_tokens_mask=False):
         ids, offsets = ([1], [(0, 0)]) if (self.bos and add_special_tokens) else ([], [])
         for m in re.finditer(r"\s*\S+", text):
             ids.append(self.vocab.setdefault(m.group(), len(self.vocab) + 2))
             offsets.append((m.start(), m.end()))
-        return {"input_ids": ids, "offset_mapping": offsets}
+        masks = [0] * len(ids)
+        if self.bos and add_special_tokens:
+            masks[0] = 1
+        return {
+            "input_ids": ids,
+            "offset_mapping": offsets,
+            "special_tokens_mask": masks,
+        }
 
 
 def stub_scorer(tokenizer, model=None):
