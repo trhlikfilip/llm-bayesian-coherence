@@ -36,20 +36,24 @@ class Scorer:
     def encode(self, prompt: str, continuation: str) -> tuple[list[int], int]:
         """Token ids through the continuation, and its first token index."""
         if not prompt or not continuation.strip():
-            raise ValueError(f"empty prompt or continuation: {prompt!r} + {continuation!r}")
+            raise ValueError(
+                f"empty prompt or continuation: {prompt!r} + {continuation!r}"
+            )
 
         enc = self.tokenizer(
             prompt + continuation,
             return_offsets_mapping=True,
+            return_special_tokens_mask=True,
             add_special_tokens=True,
         )
         ids = list(enc["input_ids"])
         offsets = list(enc["offset_mapping"])
+        masks = list(enc["special_tokens_mask"])
         boundary = len(prompt)
 
         positions = [
-            i for i, (a, b) in enumerate(offsets)
-            if b > a and a >= boundary
+            i for i, ((a, b), special) in enumerate(zip(offsets, masks))
+            if not special and a >= boundary
         ]
 
         if (
