@@ -15,7 +15,7 @@ run.py             the command line: read inputs, build prompts, score, write th
 prompts.py         quartet          ->  eight (prompt, continuation) pairs
 scorer.py          pairs + model    ->  log-probabilities, with a cache
 certificate.py     log-probs        ->  LR, F, B, K, R
-test_coherence.py  23 tests, none needs a model download
+test_coherence.py  24 tests, none needs a model download
 templates.json     two sentence templates for each of the 25 relations
 quartets.csv.gz    140,751 quartets from Wikidata, ConceptNet and WordNet
 ```
@@ -72,7 +72,7 @@ One row per quartet: the input columns (14 for the shipped file), then `model`, 
 | `lp_<a>_given_<b>` | log-probability in nats of `cont_<a>` after `prompt_<b>`, eight columns |
 | `ntok_<a>_given_<b>` | number of tokens scored for that term, eight columns |
 | `log_ratio`, `abs_log_ratio` | LR and \|LR\| |
-| `forward_margin`, `backward_margin` | F and B, how strongly the true object is preferred given the subject, and the true subject given the object (defined in The maths) |
+| `forward_log_odds_ratio`, `backward_log_odds_ratio` | F and B, the full log odds ratios for objects given subjects and subjects given objects, respectively (defined in The maths) |
 | `relative_incoherence` | R, from 0 to 1 |
 | `knowledge_score` | K, how many of the four comparisons pick the true partner (0 to 4) |
 | `forward_correct`, `backward_correct` | the forward and backward parts of K (0 to 2 each) |
@@ -81,7 +81,7 @@ The summary is printed after `score` and by `summarize`. It gives the model and 
 
 ## The maths
 
-Several of the claims below are checked in `test_coherence.py`: LR = 2(B − F), LR = 0 for conditionals of one joint, what cancels, and the edge cases of K and R.
+Several of the claims below are checked in `test_coherence.py`: LR = B − F, LR = 0 for conditionals of one joint, what cancels, and the edge cases of K and R.
 
 ### The certificate
 
@@ -91,7 +91,7 @@ A model gives two families of conditional probabilities on a quartet: objects gi
 p(o | s) = P(s, o) / P(s)        p(s | o) = P(s, o) / P(o)
 ```
 
-The ratio inside LR is the certificate of incompatibility of Emerson (2026).
+The ratio inside LR corresponds to the two products in Equation (1) of [Emerson (2026)](https://arxiv.org/html/2608.31120v1).
 
 Compatible conditionals give LR = 0 whenever the four pairs of the quartet have positive probability. Substituting the two formulas above, the numerator is P(s1,o1) P(s2,o1) P(s2,o2) P(s1,o2) divided by P(o1) P(s2) P(o2) P(s1), and the denominator is the same four joint probabilities divided by the same four marginals. So one quartet with LR ≠ 0 proves that no joint distribution produces the model's conditionals.
 
@@ -113,7 +113,7 @@ Walk around the four cells of the table, changing the object, then the subject, 
 
 Give each step the ratio of the conditional at the new cell to the one at the old cell, taken in the direction that changed: p(o2|s1)/p(o1|s1), then p(s2|o2)/p(s1|o2), then p(o1|s2)/p(o2|s2), then p(s1|o1)/p(s2|o1). Their product is the certificate ratio. Under a joint distribution each step ratio equals P(new cell) / P(old cell), for example p(o2|s1)/p(o1|s1) = P(s1,o2)/P(s1,o1), so around a closed loop the product is 1.
 
-### Margins, and LR = 2(B − F)
+### Log odds ratios, and LR = B − F
 
 Each prompt fixes one entity and offers two candidates. The eight terms pair up into four margins, each positive when the true partner wins:
 
@@ -127,12 +127,12 @@ B2 = log p(s2|o2) − log p(s1|o2)      "Berlin is the capital of"  Germany agai
 Reading LR term by term gives B1 + B2 − F1 − F2, so
 
 ```
-LR = 2 (B − F),      F = (F1 + F2) / 2   (forward),      B = (B1 + B2) / 2   (backward).
+LR = B − F,      F = F1 + F2   (forward),      B = B1 + B2   (backward).
 ```
 
-`derive()` in `certificate.py` computes LR from its definition and stops with an error if this identity fails.
+`derive()` computes the four comparisons once, sums them into F and B, and calculates LR = B − F. The tests compare this calculation with the eight-term certificate definition.
 
-The margins are log odds ratios. exp(2F) = [p(o1|s1)/p(o2|s1)] · [p(o2|s2)/p(o1|s2)] is the odds ratio of the 2×2 table implied by the forward family, exp(2B) the one implied by the backward family, and LR = 0 means they are equal.
+F and B are full log odds ratios. The individual comparisons F1, F2, B1 and B2 are log probability ratios. exp(F) = [p(o1|s1)/p(o2|s1)] · [p(o2|s2)/p(o1|s2)] is the odds ratio of the 2×2 table implied by the forward family, exp(B) the one implied by the backward family, and LR = 0 means they are equal.
 
 LR < 0 means F > B, so the forward direction implies the stronger association. Putting the backward terms in the numerator is a convention. Swapping the two facts (s1 with s2 together with o1 with o2) leaves LR, F, B and K unchanged. Swapping only the subjects, or only the objects, pairs each subject with the wrong object and flips the signs of LR, F and B.
 
@@ -149,8 +149,8 @@ If both families were read from one sentence template T(s, o), p(o | s) would be
 ### K, R and pairwise accuracy
 
 - K counts the positive margins among F1, F2, B1, B2, from 0 to 4. A tie counts as wrong. It measures a choice between the two candidates of the quartet, and chance is 2.
-- R = |LR| / (2|F| + 2|B|) = |B − F| / (|F| + |B|) lies between 0 and 1. LR is the difference of the two log odds ratios 2B and 2F, and for margins of these sizes |LR| is largest, at 2|F| + 2|B|, when they have opposite signs. So R is |LR| as a share of the largest value it could take. R = 1 exactly when F and B have opposite signs or exactly one of them is zero, and R = 0 exactly when F = B. It is defined as 0 when F = B = 0, and it is unstable when both margins are near zero.
-- Pairwise accuracy is the share of positive margins in one direction: forward over F1 and F2, backward over B1 and B2, chance 0.5.
+- R = |LR| / (|F| + |B|) = |B − F| / (|F| + |B|) lies between 0 and 1. LR is the difference of the full log odds ratios B and F. For fixed |F| and |B|, the largest possible |LR| is |F| + |B|, attained when F and B have opposite signs or exactly one is zero. R expresses |LR| relative to that maximum. R = 0 when F = B, and is defined as 0 when F = B = 0. It is unstable when both log odds ratios are near zero.
+- - Pairwise accuracy is the share of positive margins in one direction: forward over F1 and F2, backward over B1 and B2, chance 0.5.
 
 ### Scoring conventions
 
