@@ -100,12 +100,18 @@ def random_lp(rng):
     return {t: -rng.uniform(0, 40) for t in TERMS}
 
 
-def test_LR_equals_2_times_B_minus_F():
+def test_LR_matches_direct_certificate_and_full_log_odds_ratios():
     rng = random.Random(0)
     for _ in range(500):
-        d = derive(random_lp(rng))
-        assert math.isclose(d["log_ratio"], 2 * (d["backward_margin"] - d["forward_margin"]), abs_tol=1e-9)
-        assert 0 <= d["knowledge_score"] <= 4 and 0 <= d["relative_incoherence"] <= 1
+        lp = random_lp(rng)
+        d = derive(lp)
+        F = d["forward_log_odds_ratio"]
+        B = d["backward_log_odds_ratio"]
+
+        assert math.isclose(d["log_ratio"], log_ratio(lp), abs_tol=1e-9)
+        assert math.isclose(d["log_ratio"], B - F, abs_tol=1e-9)
+        assert 0 <= d["relative_incoherence"] <= 1
+        assert 0 <= d["knowledge_score"] <= 4
         assert d["knowledge_score"] == d["forward_correct"] + d["backward_correct"]
 
 
